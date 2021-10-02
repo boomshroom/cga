@@ -6,9 +6,9 @@
 #![allow(non_camel_case_types)]
 
 //use std::fmt;
-use std::ops::{Add, BitAnd, BitOr, BitXor, Index, IndexMut, Mul, Neg, Not, Sub, Div};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Index, IndexMut, Mul, Neg, Not, Sub};
 
-use num_traits::{Zero, One};
+use num_traits::{One, Zero};
 use simba::simd::SimdRealField as Field;
 
 /// The general multivector type. Used internally to implement the operations on the various specialized types.
@@ -326,16 +326,15 @@ impl<T: Field> R410<T> {
         }
     }
 
-    pub fn i() -> Self { Self::e123pn() }
+    pub fn i() -> Self {
+        Self::e123pn()
+    }
 }
 
 impl<T: Zero + PartialEq> From<T> for R410<T> {
     #[inline]
     fn from(s: T) -> Self {
-        Self {
-            s,
-            ..Self::zero()
-        }
+        Self { s, ..Self::zero() }
     }
 }
 

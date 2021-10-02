@@ -1,9 +1,9 @@
-mod point;
-mod pair;
 mod circle;
+mod pair;
+mod point;
 mod sphere;
 
-pub use point::Point;
-pub use pair::Pair;
 pub use circle::Circle;
+pub use pair::Pair;
+pub use point::Point;
 pub use sphere::Sphere;

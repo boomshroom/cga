@@ -131,8 +131,8 @@ impl Zero for F32 {
     fn zero() -> Self {
         Self(0.0)
     }
-     #[inline]
-   fn is_zero(&self) -> bool {
+    #[inline]
+    fn is_zero(&self) -> bool {
         self.0 == 0.0 || self.0 == -0.0
     }
 }

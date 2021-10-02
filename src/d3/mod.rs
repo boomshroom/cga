@@ -1,14 +1,14 @@
 mod r410;
 //use simba::simd::SimdRealField as Field;
 
+mod dual;
 mod flat;
+mod free;
 mod round;
 mod transform;
-mod dual;
-mod free;
 
-pub use round::{Point, Pair, Circle, Sphere};
 pub use flat::{Line, Plane};
+pub use round::{Circle, Pair, Point, Sphere};
 
 /*
 #[derive(Debug, Copy, Clone, Default)]

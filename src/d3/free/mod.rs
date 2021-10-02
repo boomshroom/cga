@@ -1,9 +1,9 @@
 //! Contains definitions for standard Euclidean geometric objects, namely vectors, bivectors, etc.
 
-mod vector;
 mod bivector;
 mod trivector;
+mod vector;
 
-pub use vector::Vector;
 pub use bivector::Bivector;
 pub use trivector::Trivector;
+pub use vector::Vector;

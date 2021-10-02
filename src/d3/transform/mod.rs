@@ -1,7 +1,7 @@
+mod motor;
 mod rotor;
 mod translate;
-mod motor;
 
+pub use motor::Motor;
 pub use rotor::Rotor;
 pub use translate::Translator;
-pub use motor::Motor;
