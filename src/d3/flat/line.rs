@@ -1,14 +1,17 @@
 use core::ops::Mul;
 
+use num_traits::{zero, one};
+
 use simba::simd::SimdRealField as Field;
 
-use crate::Dual;
+use crate::{R410, Multivec, Dual};
 
+use super::super::free::Vector;
 use super::super::dual::DLine;
 use super::super::transform::Motor;
 
 #[derive(Copy, Clone, Debug)]
-pub struct Line<T: Field> {
+pub struct Line<T> {
     /// Corresponds to both e12p and e12n
     pub(crate) e12i: T,
     /// Corresponds to both e13p and e13n
@@ -20,8 +23,33 @@ pub struct Line<T: Field> {
     pub(crate) e3pn: T,
 }
 
-impl<T: Field> Dual for Line<T> {
+impl <T: Field + Copy> Multivec for Line<T> {
+    type Element = T;
+	#[inline]
+	fn into_mv(self) -> R410<T> {
+		let Line{e12i, e13i, e23i, e1pn, e2pn, e3pn} = self;
+		R410{e12p: e12i, e12n: e12i, e13p: e13i, e13n: e13i, e23p: e23i, e23n: e23i, e1pn, e2pn, e3pn, ..zero()}
+	}
+
+    #[inline]
+    fn from_mv(v: R410<T>) -> Self {
+        let R410{e12p, e13p, e23p, e1pn, e2pn, e3pn, ..} = v;
+        Self{e12i: e12p, e13i: e13p, e23i: e23p, e1pn, e2pn, e3pn}
+    }
+}
+
+impl <T: Field + Copy> Line<T> {
+	#[inline]
+	pub fn into_vector(self) -> Vector<T> {
+		let mink = R410{epn: one(), ..zero()};
+		Vector::from_mv(mink | self.into_mv())
+	}
+}
+
+impl<T: Field + Copy> Dual for Line<T> {
     type Output = DLine<T>;
+    /*
+    #[inline]
     fn dual(self) -> DLine<T> {
         DLine {
             e12: self.e3pn,
@@ -32,6 +60,7 @@ impl<T: Field> Dual for Line<T> {
             e3i: self.e12i,
         }
     }
+    */
 }
 
 impl<T: Field + Copy> Mul for Line<T> {

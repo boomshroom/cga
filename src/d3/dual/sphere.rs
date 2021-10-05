@@ -1,8 +1,9 @@
+use num_traits::zero;
 use simba::simd::SimdRealField as Field;
 
 use super::super::flat::Line;
 use super::super::round::{Circle, Pair, Sphere};
-use crate::Inner;
+use crate::{R410, Multivec, Scalar, Inner};
 
 #[derive(Copy, Clone, Debug)]
 pub struct DSphere<T: Field> {
@@ -24,18 +25,34 @@ impl<T: Field> DSphere<T> {
             e12pn: -self.e3,
         }
     }
+
+    pub fn dot(self, rhs: Self) -> T {
+        self.e1 * rhs.e1 + self.e2 * rhs.e2 + self.e3 * rhs.e3 + self.ep * rhs.ep - self.en * rhs.en
+    }
 }
 impl<T: Field + Copy> DSphere<T> {
     pub fn radius(self) -> T {
-        self.inner(self).simd_sqrt()
+        self.inner(self).0.simd_sqrt()
     }
 }
 
-impl<T: Field> Inner for DSphere<T> {
-    type Output = T;
-    fn inner(self, rhs: Self) -> T {
-        self.e1 * rhs.e1 + self.e2 * rhs.e2 + self.e3 * rhs.e3 + self.ep * rhs.ep - self.en * rhs.en
+impl<T: Field + Copy> Multivec for DSphere<T> {
+    type Element = T;
+    #[inline]
+    fn into_mv(self) -> R410<T> {
+        let Self { e1, e2, e3, ep, en } = self;
+        R410 { e1, e2, e3, ep, en, ..zero() }
     }
+
+    #[inline]
+    fn from_mv(v: R410<T>) -> Self {
+        let R410 { e1, e2, e3, ep, en, .. } = v;
+        Self { e1, e2, e3, ep, en }
+    }
+}
+
+impl<T: Field + Copy> Inner for DSphere<T> {
+    type Output = Scalar<T>;
 }
 
 impl<T: Field + Copy> Inner<Sphere<T>> for DSphere<T> {
@@ -58,6 +75,7 @@ impl<T: Field + Copy> Inner<Sphere<T>> for DSphere<T> {
 
 impl<T: Field + Copy> Inner<Line<T>> for DSphere<T> {
     type Output = Pair<T>;
+    #[inline]
     fn inner(self, rhs: Line<T>) -> Pair<T> {
         Pair {
             e12: (self.ep - self.en) * rhs.e12i,

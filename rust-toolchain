@@ -1,1 +1,4 @@
-nightly-2021-09-19
+[toolchain]
+channel = "nightly-2021-09-19"
+targets = ["x86_64-unknown-linux-gnu"]
+components = [ "llvm-tools-preview" ]

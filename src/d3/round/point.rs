@@ -1,16 +1,17 @@
-use simba::simd::SimdRealField as Field;
+use simba::scalar::RealField;
+use simba::simd::SimdValue;
 
-use num_traits::zero;
+use num_traits::{zero, one};
 
 use super::super::dual::{DPlane, DSphere};
-use super::super::flat::FPoint;
+use super::super::flat::{FPoint, Line};
 use super::super::free::Vector;
-use super::super::r410::R410;
+use super::super::transform::Transform;
 use super::Pair;
-use crate::{Inner, Outer};
+use crate::{R410, Multivec, Field, Scalar, Inner, Outer};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Point<T: Field> {
+pub struct Point<T> {
     pub(crate) e1: T,
     pub(crate) e2: T,
     pub(crate) e3: T,
@@ -25,16 +26,26 @@ impl<T: Field + Copy> Point<T> {
     }
 
     #[inline]
-    fn into_multivec(self) -> R410<T> {
-        let Point { e1, e2, e3, ep, en } = self;
-        R410 {
-            e1,
-            e2,
-            e3,
-            ep,
-            en,
-            ..zero()
-        }
+    pub fn no() -> Self {
+    	let half = T::from_subset(&0.5);
+    	Point {
+    		e1: zero(),
+    		e2: zero(),
+    		e3: zero(),
+    		ep: -half,
+    		en: half,
+    	}
+    }
+
+    #[inline]
+    pub(crate) fn ni() -> Self {
+    	Point {
+    		e1: zero(),
+    		e2: zero(),
+    		e3: zero(),
+    		ep: one(),
+    		en: one(),
+    	}
     }
 
     /// Convert this point into a flat point.
@@ -51,7 +62,23 @@ impl<T: Field + Copy> Point<T> {
     #[inline]
     pub fn distance(self, other: Self) -> T {
         let n2 = T::from_subset(&-2.0);
-        (self.inner(other) * n2).simd_sqrt()
+        (self.normalize().dot(other.normalize())*n2).simd_sqrt()
+    }
+
+    /// The scalar product of two points. Returns negative a half of the distance squared between them.
+    #[inline]
+    pub fn dot(self, other: Self) -> T {
+        self.inner(other).0
+    }
+
+    #[inline]
+    fn normalize(self) -> Self {
+        Self::from_mv(self.into_mv() / self.norm())
+    }
+
+    #[inline]
+    fn norm(self) -> T {
+        self.dot(Self::ni())
     }
 
     /// Constructs the dual form of the plane halfway between the two points.
@@ -77,17 +104,54 @@ impl<T: Field + Copy> Point<T> {
             en: self.en - r2,
         }
     }
+
+    /// Constructs the line along `dir` that passes through self.
+    #[inline]
+    pub fn extend_along_vec(self, dir: Vector<T>) -> Line<T> {
+        let dir = dir.into_translator();
+        self.outer(dir.transform(self)).extend()
+    }
+}
+
+impl<T: Field + Copy> Multivec for Point<T> {
+    type Element = T;
+    #[inline]
+    fn into_mv(self) -> R410<T> {
+        let Point { e1, e2, e3, ep, en } = self;
+        R410 { e1, e2, e3, ep, en, ..zero() }
+    }
+
+    #[inline]
+    fn from_mv(v: R410<T>) -> Self {
+        let R410 { e1, e2, e3, ep, en, .. } = v;
+        Self { e1, e2, e3, ep, en }
+    }
+}
+
+impl<T: RealField + Copy> Point<T> {
+    /// gets the vector pointing to this point from the origin
+    #[inline]
+    pub fn from_origin(self) -> Option<Vector<T>> {
+        let pair = Self::no().outer(self);
+        if self.norm().is_zero() {
+            None
+        } else {
+            // (x + x^2(ep + en)/2 + (en/2 - ep/2)) | (en/2 - ep/2)
+            // x^2(ep + en)/2 | en/2 - x^2(ep + en)/2 | ep/2
+            // x^2/2((en + ep)|(en - ep))
+            // x^2/2(-2)
+            // -x^2
+
+            // (x + x^2ni/2 + no) | ni
+            // x^2ni/2 | ni - 1
+            // -x^2/2 - 1
+            Some(pair.extend().into_vector().normalize() * Self::no().distance(self))
+        }
+    }
 }
 
 impl<T: Field + Copy> Inner for Point<T> {
-    type Output = T;
-    /// The inner product of two points. Returns negative a half of the distance squared between them.
-    #[inline]
-    fn inner(self, rhs: Self) -> T {
-        let R410 { s, .. } = self.into_multivec() | rhs.into_multivec();
-        s
-        //self.e1 * rhs.e1 + self.e2 * rhs.e2 + self.e3 * rhs.e3 + self.ep * rhs.ep - self.en * rhs.en
-    }
+    type Output = Scalar<T>;
 }
 
 impl<T: Field + Copy> Outer for Point<T> {
@@ -95,45 +159,67 @@ impl<T: Field + Copy> Outer for Point<T> {
     /// Join two points into a pair.
     #[inline]
     fn outer(self, rhs: Self) -> Pair<T> {
-        let R410 {
-            e12,
-            e13,
-            e23,
-            e1p,
-            e1n,
-            e2p,
-            e2n,
-            e3p,
-            e3n,
-            epn,
-            ..
-        } = self.into_multivec() ^ rhs.into_multivec();
-        Pair {
-            e12,
-            e13,
-            e23,
-            e1p,
-            e1n,
-            e2p,
-            e2n,
-            e3p,
-            e3n,
-            epn,
+        Pair::from_mv(self.into_mv() ^ rhs.into_mv())
+    }
+}
+
+impl<T> SimdValue for Point<T>
+where
+    T: Field,
+    <T as SimdValue>::Element: RealField
+{
+    type Element = Point<T::Element>;
+    type SimdBool = T::SimdBool;
+    fn lanes() -> usize { T::lanes() }
+    fn splat(val: Self::Element) -> Self {
+        Point {
+            e1: T::splat(val.e1),
+            e2: T::splat(val.e2),
+            e3: T::splat(val.e3),
+            ep: T::splat(val.ep),
+            en: T::splat(val.en),
         }
-        /*
-        Pair {
-            e12: self.e1 * rhs.e2 - self.e2 * rhs.e1,
-            e13: self.e1 * rhs.e3 - self.e3 * rhs.e1,
-            e23: self.e2 * rhs.e3 - self.e3 * rhs.e2,
-            e1p: self.e1 * rhs.ep - self.ep * rhs.e1,
-            e1n: self.e1 * rhs.en - self.en * rhs.e1,
-            e2p: self.e2 * rhs.ep - self.ep * rhs.e2,
-            e2n: self.e2 * rhs.en - self.en * rhs.e2,
-            e3p: self.e3 * rhs.ep - self.ep * rhs.e3,
-            e3n: self.e3 * rhs.en - self.en * rhs.e3,
-            epn: self.ep * rhs.en - self.en * rhs.ep,
+    }
+    fn extract(&self, i: usize) -> Self::Element {
+        Point {
+            e1: self.e1.extract(i),
+            e2: self.e2.extract(i),
+            e3: self.e3.extract(i),
+            ep: self.ep.extract(i),
+            en: self.en.extract(i),
         }
-        */
+    }
+    unsafe fn extract_unchecked(&self, i: usize) -> Self::Element {
+        Point {
+            e1: self.e1.extract_unchecked(i),
+            e2: self.e2.extract_unchecked(i),
+            e3: self.e3.extract_unchecked(i),
+            ep: self.ep.extract_unchecked(i),
+            en: self.en.extract_unchecked(i),
+        }
+    }
+    fn replace(&mut self, i: usize, val: Self::Element) {
+        self.e1.replace(i, val.e1);
+        self.e2.replace(i, val.e2);
+        self.e3.replace(i, val.e3);
+        self.ep.replace(i, val.ep);
+        self.en.replace(i, val.en);
+    }
+    unsafe fn replace_unchecked(&mut self, i: usize, val: Self::Element) {
+        self.e1.replace_unchecked(i, val.e1);
+        self.e2.replace_unchecked(i, val.e2);
+        self.e3.replace_unchecked(i, val.e3);
+        self.ep.replace_unchecked(i, val.ep);
+        self.en.replace_unchecked(i, val.en);
+    }
+    fn select(self, cond: Self::SimdBool, other: Self) -> Self {
+        Point {
+            e1: self.e1.select(cond, other.e1),
+            e2: self.e2.select(cond, other.e2),
+            e3: self.e3.select(cond, other.e3),
+            ep: self.ep.select(cond, other.ep),
+            en: self.en.select(cond, other.en),
+        }
     }
 }
 
@@ -235,6 +321,10 @@ mod test {
         let p2 = Point::new([0.0, 3.0, 0.0]);
 
         assert_eq!(p1.distance(p2), (1.0_f32 + 1.0 + 16.0).sqrt());
+        assert_eq!(p1.from_origin(), Some(Vector::new(1.0_f32, 2.0, 4.0)));
+        assert_eq!(p2.from_origin(), Some(Vector::new(0.0_f32, 3.0, 0.0)));
+        assert_eq!(Point::<f32>::no().from_origin(), Some(Vector::new(0.0_f32, 0.0, 0.0)));
+        assert_eq!(Point::<f32>::ni().from_origin(), None);
     }
 
     #[test]
@@ -245,5 +335,9 @@ mod test {
         let p2 = Point::new([F32::new(0.0), F32::new(3.0), F32::new(0.0)]);
 
         assert_eq!(p1.distance(p2), F32::new((1.0_f32 + 1.0 + 16.0).sqrt()));
+        assert_eq!(p1.from_origin(), Some(Vector::new(F32::new(1.0), F32::new(2.0), F32::new(4.0))));
+        assert_eq!(p2.from_origin(), Some(Vector::new(F32::new(0.0), F32::new(3.0), F32::new(0.0))));
+        assert_eq!(Point::<F32>::no().from_origin(), Some(Vector::new(F32::new(0.0), F32::new(0.0), F32::new(0.0))));
+        assert_eq!(Point::<F32>::ni().from_origin(), None);
     }
 }

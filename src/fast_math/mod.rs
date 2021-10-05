@@ -20,12 +20,19 @@ pub struct F32(f32);
 impl F32 {
     #[inline]
     pub fn new(x: f32) -> Self {
-        assert!(
-            x.is_finite(),
-            "Fast math operations unsafe with infinity and NaN"
-        );
-        F32(x)
+        Self::try_new(x).expect("Fast math operations unsafe with infinity and NaN")
     }
+
+    #[inline]
+    pub fn try_new(x: f32) -> Option<Self> {
+        if !x.is_finite() {
+            None
+        } else {
+            Some(F32(x))
+        }
+    }
+
+    pub fn into_inner(self) -> f32 { self.0 }
 }
 
 impl From<Z> for F32 {
@@ -90,7 +97,7 @@ impl Div for F32 {
     type Output = Self;
     #[inline]
     fn div(self, rhs: Self) -> Self {
-        debug_assert!(!rhs.is_zero(), "Division by zero");
+        assert!(!rhs.is_zero(), "Division by zero");
         unsafe { Self(fdiv_fast(self.0, rhs.0)) }
     }
 }
@@ -106,7 +113,7 @@ impl Rem for F32 {
     type Output = Self;
     #[inline]
     fn rem(self, rhs: Self) -> Self {
-        debug_assert!(!rhs.is_zero(), "Division by zero");
+        assert!(!rhs.is_zero(), "Division by zero");
         unsafe { Self(frem_fast(self.0, rhs.0)) }
     }
 }
@@ -161,14 +168,14 @@ impl SimdValue for F32 {
         x
     }
     fn extract(&self, i: usize) -> Self {
-        debug_assert_eq!(i, 0);
+        assert_eq!(i, 0);
         *self
     }
     unsafe fn extract_unchecked(&self, _i: usize) -> Self {
         *self
     }
     fn replace(&mut self, i: usize, val: Self) {
-        debug_assert_eq!(i, 0);
+        assert_eq!(i, 0);
         *self = val
     }
     unsafe fn replace_unchecked(&mut self, _i: usize, val: Self) {
@@ -195,6 +202,17 @@ impl SubsetOf<F32> for F32 {
         true
     }
 }
+impl SubsetOf<f32> for F32 {
+    fn to_superset(&self) -> f32 {
+        self.0
+    }
+    fn from_superset_unchecked(element: &f32) -> Self {
+        Self::new(*element)
+    }
+    fn is_in_subset(element: &f32) -> bool {
+        element.is_finite()
+    }
+}
 impl SubsetOf<F32> for f64 {
     #[inline]
     fn to_superset(&self) -> F32 {
@@ -202,6 +220,18 @@ impl SubsetOf<F32> for f64 {
     }
     fn from_superset_unchecked(element: &F32) -> Self {
         element.0 as f64
+    }
+    fn is_in_subset(_element: &F32) -> bool {
+        true
+    }
+}
+impl SubsetOf<F32> for f32 {
+    #[inline]
+    fn to_superset(&self) -> F32 {
+        F32::new(*self)
+    }
+    fn from_superset_unchecked(element: &F32) -> Self {
+        element.0
     }
     fn is_in_subset(_element: &F32) -> bool {
         true
@@ -262,7 +292,7 @@ impl ComplexField for F32 {
         Self(self.0.hypot(other.0))
     }
     fn recip(self) -> Self {
-        debug_assert!(!self.is_zero(), "Division by zero");
+        assert!(!self.is_zero(), "Division by zero");
         Self(self.0.recip())
     }
     fn conjugate(self) -> Self {
@@ -282,16 +312,18 @@ impl ComplexField for F32 {
         Self(self.0.tan())
     }
     fn asin(self) -> Self {
-        debug_assert!(
-            self.0 < 1.0 && self.0 > -1.0,
-            "Arcsin argument outside domain"
+        assert!(
+            (-1.0..=1.0).contains(&self.0),
+            "Arcsin argument outside domain: {}",
+            self.0,
         );
         Self(self.0.asin())
     }
     fn acos(self) -> Self {
-        debug_assert!(
-            self.0 < 1.0 && self.0 > -1.0,
-            "Arccos argument outside domain"
+        assert!(
+            (-1.0..=1.0).contains(&self.0),
+            "Arccos argument outside domain: {}",
+            self.0,
         );
         Self(self.0.acos())
     }
@@ -311,38 +343,39 @@ impl ComplexField for F32 {
         Self(self.0.asinh())
     }
     fn acosh(self) -> Self {
-        debug_assert!(self.0 >= 1.0, "Arccosh argument outside domain");
+        assert!(self.0 >= 1.0, "Arccosh argument outside domain");
         Self(self.0.acosh())
     }
     fn atanh(self) -> Self {
-        debug_assert!(
-            self.0 < 1.0 && self.0 > -1.0,
-            "Arctanh argument outside domain"
+        assert!(
+            self.0 > -1.0 && self.0 < 1.0,
+            "Arctanh argument outside domain: {}",
+            self.0,
         );
         Self(self.0.atanh())
     }
     fn log(self, base: Self) -> Self {
-        debug_assert!(self.0 > 0.0, "log argument outside domain");
+        assert!(self.0 > 0.0, "log argument outside domain");
         Self(self.0.log(base.0))
     }
     fn log2(self) -> Self {
-        debug_assert!(self.0 > 0.0, "log argument outside domain");
+        assert!(self.0 > 0.0, "log argument outside domain");
         Self(self.0.log2())
     }
     fn log10(self) -> Self {
-        debug_assert!(self.0 > 0.0, "log argument outside domain");
+        assert!(self.0 > 0.0, "log argument outside domain");
         Self(self.0.log10())
     }
     fn ln(self) -> Self {
-        debug_assert!(self.0 > 0.0, "log argument outside domain");
+        assert!(self.0 > 0.0, "log argument outside domain");
         Self(self.0.ln())
     }
     fn ln_1p(self) -> Self {
-        debug_assert!(self.0 > -1.0, "log argument outside domain");
+        assert!(self.0 > -1.0, "log argument outside domain");
         Self(self.0.ln_1p())
     }
     fn sqrt(self) -> Self {
-        debug_assert!(self.0 >= 0.0, "Imaginary square root");
+        assert!(self.0 >= 0.0, "Imaginary square root");
         Self(self.0.sqrt())
     }
     fn exp(self) -> Self {
@@ -370,7 +403,7 @@ impl ComplexField for F32 {
         self.0.is_finite()
     }
     fn try_sqrt(self) -> Option<Self> {
-        self.0.try_sqrt().map(Self)
+        self.0.try_sqrt().map(Self::new)
     }
 }
 

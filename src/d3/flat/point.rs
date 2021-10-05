@@ -1,10 +1,8 @@
+use num_traits::zero;
 use core::ops::Mul;
 
-use simba::simd::SimdRealField as Field;
-
-use super::super::free::{Bivector, Vector};
-use super::super::transform::Translator;
-use super::{Line, Plane};
+use crate::{R410, Multivec, Field};
+use super::super::transform::{Translator};
 
 #[derive(Copy, Clone, Debug)]
 pub struct FPoint<T: Field + Copy> {
@@ -16,28 +14,27 @@ pub struct FPoint<T: Field + Copy> {
     pub(crate) e3i: T,
     pub(crate) epn: T,
 }
-
-impl<T: Field + Copy> FPoint<T> {
-    /// Constructs the line along `dir` that passes through self.
-    pub fn extend_along_vec(self, dir: Vector<T>) -> Line<T> {
-        Line {
-            e12i: self.e2i * dir.e1 - self.e1i * dir.e2,
-            e13i: self.e3i * dir.e1 - self.e1i * dir.e3,
-            e23i: self.e3i * dir.e2 - self.e2i * dir.e3,
-            e1pn: self.epn * dir.e1,
-            e2pn: self.epn * dir.e2,
-            e3pn: self.epn * dir.e3,
+impl<T: Field + Copy> Multivec for FPoint<T> {
+    type Element = T;
+    #[inline]
+    fn into_mv(self) -> R410<T> {
+        let Self{ e1i, e2i, e3i, epn } = self;
+        R410{
+            e1p: e1i,
+            e1n: e1i,
+            e2p: e2i,
+            e2n: e2i,
+            e3p: e3i,
+            e3n: e3i,
+            epn,
+            ..zero()
         }
     }
 
-    /// Constructs the plane along `dir` that passes through self.
-    pub fn extend_along_bivec(self, dir: Bivector<T>) -> Plane<T> {
-        Plane {
-            e123i: self.e1i * dir.e23 - self.e2i * dir.e13 + self.e3i * dir.e12,
-            e12pn: self.epn * dir.e12,
-            e13pn: self.epn * dir.e13,
-            e23pn: self.epn * dir.e23,
-        }
+    #[inline]
+    fn from_mv(v: R410<T>) -> Self {
+        let R410{ e1p, e2p, e3p, epn, .. } = v;
+        Self{ e1i: e1p, e2i: e2p, e3i: e3p, epn }
     }
 }
 

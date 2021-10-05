@@ -1,8 +1,9 @@
-use simba::simd::SimdRealField as Field;
+use num_traits::zero;
 
 use super::super::flat::Plane;
+use super::super::dual::DLine;
 use super::{Point, Sphere};
-use crate::Outer;
+use crate::{R410, Multivec, Field, Outer};
 
 #[derive(Copy, Clone, Debug)]
 pub struct Circle<T: Field> {
@@ -18,7 +19,7 @@ pub struct Circle<T: Field> {
     pub(crate) e3pn: T,
 }
 
-impl<T: Field> Circle<T> {
+impl<T: Field + Copy> Circle<T> {
     /// Extends the circle into the infinite plane containing it.
     pub fn extend(self) -> Plane<T> {
         Plane {
@@ -26,6 +27,81 @@ impl<T: Field> Circle<T> {
             e12pn: self.e12p - self.e12n,
             e13pn: self.e13p - self.e13n,
             e23pn: self.e23p - self.e23n,
+        }
+    }
+
+    /// Constructs the dual form of the perpendicular line through the circle's center
+    pub fn axis(self) -> DLine<T> {
+        DLine::from_mv(Point::ni().into_mv() | self.into_mv())
+        /*
+        DLine {
+            e12: self.e12p - self.e12n,
+            e13: self.e13p - self.e13n,
+            e23: self.e23p - self.e23n,
+            e1i: -self.e1pn,
+            e2i: -self.e2pn,
+            e3i: -self.e3pn,
+        }
+        */
+    }
+}
+impl<T: Field + Copy> Multivec for Circle<T> {
+    type Element = T;
+    #[inline]
+    fn into_mv(self) -> R410<T> {
+        let Circle{
+            e123,
+            e12p,
+            e12n,
+            e13p,
+            e13n,
+            e23p,
+            e23n,
+            e1pn,
+            e2pn,
+            e3pn,
+        } = self;
+        R410{
+            e123,
+            e12p,
+            e12n,
+            e13p,
+            e13n,
+            e23p,
+            e23n,
+            e1pn,
+            e2pn,
+            e3pn,
+            ..zero()
+        }
+    }
+
+    #[inline]
+    fn from_mv(v: R410<T>) -> Self {
+        let R410{
+            e123,
+            e12p,
+            e12n,
+            e13p,
+            e13n,
+            e23p,
+            e23n,
+            e1pn,
+            e2pn,
+            e3pn,
+            ..
+        } = v;
+        Self{
+            e123,
+            e12p,
+            e12n,
+            e13p,
+            e13n,
+            e23p,
+            e23n,
+            e1pn,
+            e2pn,
+            e3pn,
         }
     }
 }

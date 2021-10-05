@@ -1581,7 +1581,7 @@ impl<T: Field + Copy> BitAnd for R410<T> {
 impl<T: Field + Copy> BitOr for R410<T> {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn bitor(self, b: Self) -> Self {
         let a = self;
         Self {
@@ -2024,6 +2024,7 @@ impl<T: Field + Copy> Sub<T> for R410<T> {
 
 impl<T: Field + Copy> Div<T> for R410<T> {
     type Output = Self;
+    #[inline]
     fn div(self, b: T) -> Self {
         self * b.simd_recip()
     }

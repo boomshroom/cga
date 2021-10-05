@@ -1,13 +1,13 @@
+use num_traits::zero;
 use simba::scalar::RealField;
-use simba::simd::SimdRealField as Field;
 
 use super::super::dual::DPlane;
 use super::super::flat::Line;
 use super::{Circle, Point};
-use crate::{Inner, Outer};
+use crate::{R410, Multivec, Field, Scalar, Inner, Outer};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct Pair<T: Field> {
+pub struct Pair<T> {
     pub(crate) e12: T,
     pub(crate) e13: T,
     pub(crate) e23: T,
@@ -22,6 +22,7 @@ pub struct Pair<T: Field> {
 
 impl<T: Field> Pair<T> {
     /// Extends the pair into the infinite line connecting the two.
+    #[inline]
     pub fn extend(self) -> Line<T> {
         Line {
             e12i: self.e12,
@@ -34,6 +35,7 @@ impl<T: Field> Pair<T> {
     }
 
     /// Constructs the dual form of the plane halfway between the two points.
+    #[inline]
     fn midplane(self) -> DPlane<T> {
         // ei · self
         DPlane {
@@ -45,40 +47,93 @@ impl<T: Field> Pair<T> {
     }
 }
 
-impl<T: RealField + Copy> Pair<T> {
-    pub fn decompose(self) -> Option<(Point<T>, Point<T>)> {
-        let desc = self.inner(self);
-        if desc.is_negative() {
-            return None;
+impl<T: Field + Copy> Multivec for Pair<T> {
+    type Element = T;
+    #[inline]
+    fn into_mv(self) -> R410<T> {
+        let Pair{
+            e12,
+            e13,
+            e23,
+            e1p,
+            e1n,
+            e2p,
+            e2n,
+            e3p,
+            e3n,
+            epn,
+        } = self;
+        R410{
+            e12,
+            e13,
+            e23,
+            e1p,
+            e1n,
+            e2p,
+            e2n,
+            e3p,
+            e3n,
+            epn,
+            ..zero()
         }
+    }
 
-        let s = desc.sqrt();
-        let plane = self.midplane();
+    #[inline]
+    fn from_mv(v: R410<T>) -> Self {
+        let R410{
+            e12,
+            e13,
+            e23,
+            e1p,
+            e1n,
+            e2p,
+            e2n,
+            e3p,
+            e3n,
+            epn,
+            ..
+        } = v;
+        Self{
+            e12,
+            e13,
+            e23,
+            e1p,
+            e1n,
+            e2p,
+            e2n,
+            e3p,
+            e3n,
+            epn,
+        }
+    }
+}
 
-        let s_plane = DPlane {
-            e1: plane.e1 * s,
-            e2: plane.e2 * s,
-            e3: plane.e3 * s,
-            ei: plane.ei * s,
-        };
+impl<T: RealField + Copy> Pair<T> {
 
-        let mid = self.inner(plane);
-        Some((
-            Point {
-                e1: s_plane.e1 + mid.e1,
-                e2: s_plane.e2 + mid.e2,
-                e3: s_plane.e3 + mid.e3,
-                ep: s_plane.ei + mid.ep,
-                en: s_plane.ei + mid.en,
-            },
-            Point {
-                e1: s_plane.e1 - mid.e1,
-                e2: s_plane.e2 - mid.e2,
-                e3: s_plane.e3 - mid.e3,
-                ep: s_plane.ei - mid.ep,
-                en: s_plane.ei - mid.en,
-            },
-        ))
+    #[inline]
+    pub fn decompose(self) -> Option<(Point<T>, Point<T>)> {
+        let s = self.inner(self).0.try_sqrt()?;
+
+        let pair = self.into_mv();
+        let plane = Point::ni().into_mv() | pair;
+
+        if plane.e1.is_zero() && plane.e2.is_zero() && plane.e3.is_zero() {
+            // Second point is infinity
+            Some((
+                Point::from_mv(Point::no().into_mv() | pair),
+                Point::ni(),
+            ))
+        } else {
+            Some((
+            	Point::from_mv((pair + s) | plane),
+            	Point::from_mv((-pair + s) | plane)
+            ))
+        }
+    }
+
+    #[inline]
+    pub(crate) fn norm_squared(self) -> T {
+        self.into_mv().norm_squared()
     }
 }
 
@@ -101,21 +156,8 @@ impl<T: Field + Copy> Outer<Point<T>> for Pair<T> {
     }
 }
 
-impl<T: Field> Inner for Pair<T> {
-    type Output = T;
-    /// Construct the circle passing through all 3 points.
-    fn inner(self, rhs: Self) -> T {
-        -self.e12 * rhs.e12
-            - self.e13 * rhs.e13
-            - self.e23 * rhs.e23
-            - self.e1p * rhs.e1p
-            - self.e2p * rhs.e2p
-            - self.e3p * rhs.e3p
-            + self.e1n * rhs.e1n
-            + self.e2n * rhs.e2n
-            + self.e3n * rhs.e3n
-            + self.epn * rhs.epn
-    }
+impl<T: Field + Copy> Inner for Pair<T> {
+    type Output = Scalar<T>;
 }
 
 impl<T: Field + Copy> Inner<DPlane<T>> for Pair<T> {
