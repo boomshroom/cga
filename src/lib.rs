@@ -1,7 +1,9 @@
 #![cfg_attr(feature = "unstable", feature(core_intrinsics))]
+#![cfg_attr(all(feature = "unstable", feature = "repr_simd"), feature(repr_simd))]
+#[cfg(all(feature = "repr_simd", not(feature = "unstable")))]
+compile_error!("#[repr(simd)] requires unstable.");
 
-
-use num_traits::zero;
+use num_traits::{zero, Zero};
 use simba::simd::SimdRealField as Field;
 
 #[cfg(feature = "unstable")]
@@ -13,7 +15,15 @@ pub use fast_math::F32;
 mod r410;
 use r410::R410;
 
+#[macro_use]
+mod traits;
+
 pub mod d3;
+
+mod spaces;
+
+use spaces::IBasis;
+pub use spaces::{Euclidean, Hyperbolic, Space, Spherical};
 
 /// A constant zero to save on calculations and space when using general multivectors.
 #[derive(Debug, Copy, Clone, Default)]
@@ -28,11 +38,15 @@ impl From<Z> for f32 {
 pub struct Scalar<T>(pub T);
 
 mod sealed {
-    use core::ops::{Mul, BitAnd, BitOr, Not};
-    use super::{R410, Field};
+    use super::{Field, R410};
+    use core::ops::{BitAnd, BitOr, Mul, Not};
 
-    pub trait Multivec : Sized
-    where R410<Self::Element>: Mul<Output = R410<Self::Element>> + BitOr<Output = R410<Self::Element>> + BitAnd<Output = R410<Self::Element>> + Not<Output = R410<Self::Element>>
+    pub trait Multivec: Sized
+    where
+        R410<Self::Element>: Mul<Output = R410<Self::Element>>
+            + BitOr<Output = R410<Self::Element>>
+            + BitAnd<Output = R410<Self::Element>>
+            + Not<Output = R410<Self::Element>>,
     {
         type Element: Field + Copy;
         fn into_mv(self) -> R410<Self::Element>;
@@ -43,16 +57,25 @@ use sealed::Multivec;
 
 impl<T: Field + Copy> Multivec for Scalar<T> {
     type Element = T;
-    fn into_mv(self) -> R410<Self::Element> { R410{s: self.0, ..zero()} }
-    fn from_mv(v: R410<Self::Element>) -> Self { Self(v.s) }
+    #[inline]
+    fn into_mv(self) -> R410<Self::Element> {
+        R410 {
+            s: self.0,
+            ..zero()
+        }
+    }
+    #[inline]
+    fn from_mv(v: R410<Self::Element>) -> Self {
+        Self(v.s)
+    }
 }
-
 
 /// Connects two objects into a higher dimensional object that passes through both.
 /// The grade-increasing part of the geometric product.
 /// Also known as the wedge product or outer product.
-pub trait Join<RHS: Multivec<Element=Self::Element> = Self>: Multivec {
-    type Output: Multivec<Element=Self::Element>;
+pub trait Join<RHS: Multivec<Element = Self::Element> = Self>: Multivec {
+    type Output: Multivec<Element = Self::Element>;
+    #[inline]
     fn join(self, rhs: RHS) -> Self::Output {
         Multivec::from_mv(self.into_mv() ^ rhs.into_mv())
     }
@@ -60,15 +83,17 @@ pub trait Join<RHS: Multivec<Element=Self::Element> = Self>: Multivec {
 
 /// The meet operator to find the intersection between two objects
 /// Also known as the regressive product
-pub trait Meet<RHS: Multivec<Element=Self::Element> = Self>: Multivec {
-    type Output: Multivec<Element=Self::Element>;
+pub trait Meet<RHS: Multivec<Element = Self::Element> = Self>: Multivec {
+    type Output: Multivec<Element = Self::Element>;
+    #[inline]
     fn meet(self, rhs: RHS) -> Self::Output {
         Multivec::from_mv(self.into_mv() & rhs.into_mv())
     }
 }
 
 pub trait Dual: Multivec {
-    type Output: Multivec<Element=Self::Element>;
+    type Output: Multivec<Element = Self::Element>;
+    #[inline]
     fn dual(self) -> Self::Output {
         Multivec::from_mv(!self.into_mv())
     }
@@ -82,16 +107,20 @@ pub trait Reflect<RHS> {
 
 /// The grade-reducing part of the geometric product.
 /// Also known as the dot product.
-pub trait Inner<RHS: Multivec<Element=Self::Element> = Self>: Multivec {
-    type Output: Multivec<Element=Self::Element>;
+pub trait Inner<RHS: Multivec<Element = Self::Element> = Self>: Multivec {
+    type Output: Multivec<Element = Self::Element>;
+    #[inline]
     fn inner(self, rhs: RHS) -> Self::Output {
         Multivec::from_mv(self.into_mv() | rhs.into_mv())
     }
 }
 
-pub trait Outer<RHS = Self> {
-    type Output;
-    fn outer(self, rhs: RHS) -> Self::Output;
+pub trait Outer<RHS: Multivec<Element = Self::Element> = Self>: Multivec {
+    type Output: Multivec<Element = Self::Element>;
+    #[inline]
+    fn outer(self, rhs: RHS) -> Self::Output {
+        Multivec::from_mv(self.into_mv() ^ rhs.into_mv())
+    }
 }
 
 /// The anticommutative part of the geometric product.
@@ -114,7 +143,7 @@ impl<V, W> Meet<W> for V
 where
     V: Dual,
     <V as Dual>::Output: Inner<W>,
-    W: Multivec<Element=Self::Element>,
+    W: Multivec<Element = Self::Element>,
 {
     type Output = <<V as Dual>::Output as Inner<W>>::Output;
 }

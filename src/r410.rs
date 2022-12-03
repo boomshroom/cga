@@ -5,8 +5,8 @@
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 
-//use std::fmt;
-use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Index, IndexMut, Mul, Neg, Not, Sub};
+use std::fmt::{self, Display, Formatter, LowerExp, UpperExp};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Div, Index, IndexMut, Mul, Neg, Not, Shr, Sub};
 
 use num_traits::{One, Zero};
 use simba::simd::SimdRealField as Field;
@@ -338,6 +338,36 @@ impl<T: Zero + PartialEq> From<T> for R410<T> {
     }
 }
 
+macro_rules! print_fields {
+    ($this:expr, $f:expr, $fmt:literal, ($($field:ident),*)) => {
+        $(
+            if !$this.$field.is_zero() {
+                write!($f, concat!($fmt, stringify!($field)), $this.$field)?;
+            }
+        )*
+    };
+    ($this:expr, $f:expr, $fmt:literal) => {
+        if !$this.s.is_zero() { write!($f, $fmt, $this.s)?; }
+        print_fields!($this, $f, $fmt, (
+            e1, e2, e3, ep, en, e12, e13, e23, e1p, e1n, e2p, e2n, e3p, e3n, epn, e123, e12p, e12n, e13p, e13n, e23p, e23n, e1pn, e2pn, e3pn, e123p, e123n, e12pn, e13pn, e23pn, e123pn
+        ));
+    }
+}
+
+macro_rules! impl_fmt {
+    ($($trait:ident($fmt:literal)),*) => {$(
+        impl<T: $trait + Zero> $trait for R410<T> {
+            #[inline]
+            fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+                print_fields!(self, f, $fmt);
+                Ok(())
+            }
+        }
+    )*};
+}
+
+impl_fmt!(Display("{:+}"), LowerExp("{:+e}"), UpperExp("{:+E}"));
+
 /*
 impl<T: Field+Copy+Display> fmt::Display for R410<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -362,9 +392,14 @@ impl<T: Field+Copy+Display> fmt::Display for R410<T> {
 // Dual
 // Poincare duality operator.
 impl<T: Field + Copy> R410<T> {
-    #[inline]
+    #[inline(always)]
     pub fn dual(self) -> Self {
         self / Self::i()
+    }
+
+    #[inline]
+    pub fn undual(self) -> Self {
+        self * Self::i()
     }
 }
 
@@ -473,6 +508,7 @@ impl<T: Neg<Output = T>> R410<T> {
 
 // Mul
 // The geometric product.
+// The monster product.
 impl<T: Field + Copy> Mul for R410<T> {
     type Output = R410<T>;
 
@@ -1401,7 +1437,7 @@ impl<T: Field + Copy> Mul for R410<T> {
 
 impl<T: Field + Copy> Div for R410<T> {
     type Output = Self;
-    #[inline]
+    #[inline(always)]
     fn div(self, b: Self) -> Self {
         self * b.recip()
     }
@@ -1412,7 +1448,7 @@ impl<T: Field + Copy> Div for R410<T> {
 impl<T: Field + Copy> BitXor for R410<T> {
     type Output = Self;
 
-    #[inline]
+    #[inline(always)]
     fn bitxor(self, b: Self) -> Self {
         let a = self;
         Self {
@@ -1570,9 +1606,20 @@ impl<T: Field + Copy> BitXor for R410<T> {
 impl<T: Field + Copy> BitAnd for R410<T> {
     type Output = R410<T>;
 
-    #[inline]
+    #[inline(always)]
     fn bitand(self, b: R410<T>) -> Self {
         self.dual() | b
+    }
+}
+
+// The sandwich product.
+// Usually represented as a >>> b
+impl<T: Field + Copy> Shr for R410<T> {
+    type Output = R410<T>;
+
+    #[inline(always)]
+    fn shr(self, b: R410<T>) -> Self {
+        self * b * self.reverse()
     }
 }
 
@@ -2117,21 +2164,23 @@ impl Sub<R410<f32>> for f32 {
 impl<T: Field + Copy> R410<T> {
     #[inline]
     pub fn norm_squared(self) -> T {
-        (self * self.conjugate()).s
+        (self * self.reverse()).s
     }
     #[inline]
     pub fn norm(self) -> T {
-        self.norm_squared().simd_abs().simd_sqrt()
+        self.norm_squared().simd_sqrt()
     }
     #[inline]
     pub fn recip(self) -> Self {
         self.conjugate() / self.norm_squared()
     }
 
+    #[inline]
     pub fn inorm(self) -> T {
         self.dual().norm()
     }
 
+    #[inline]
     pub fn normalized(self) -> Self {
         self / self.norm()
     }

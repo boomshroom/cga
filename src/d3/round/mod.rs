@@ -5,5 +5,5 @@ mod sphere;
 
 pub use circle::Circle;
 pub use pair::Pair;
-pub use point::Point;
+pub use point::{Point, origin};
 pub use sphere::Sphere;

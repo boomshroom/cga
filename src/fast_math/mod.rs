@@ -1,6 +1,6 @@
 //! Fast math wrappers to improve optimizations involving subtracting like terms and multiplying/adding zeroes.
 
-use core::fmt::{self, Display, Formatter};
+use core::fmt::{self, Debug, Display, Formatter, LowerExp, UpperExp};
 use core::intrinsics::{fadd_fast, fdiv_fast, fmul_fast, frem_fast, fsub_fast};
 use core::ops::{
     Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Rem, RemAssign, Sub, SubAssign,
@@ -32,7 +32,10 @@ impl F32 {
         }
     }
 
-    pub fn into_inner(self) -> f32 { self.0 }
+    #[inline]
+    pub fn into_inner(self) -> f32 {
+        self.0
+    }
 }
 
 impl From<Z> for F32 {
@@ -42,11 +45,17 @@ impl From<Z> for F32 {
     }
 }
 
-impl Display for F32 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.0, f)
-    }
+macro_rules! impl_fmt {
+    ($($trait:path),*) => {$(
+        impl $trait for F32 {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                <f32 as $trait>::fmt(&self.0, f)
+            }
+        }
+    )*};
 }
+
+impl_fmt!(Display, LowerExp, UpperExp);
 
 impl Add for F32 {
     type Output = Self;
@@ -403,7 +412,7 @@ impl ComplexField for F32 {
         self.0.is_finite()
     }
     fn try_sqrt(self) -> Option<Self> {
-        self.0.try_sqrt().map(Self::new)
+        self.0.try_sqrt().and_then(Self::try_new)
     }
 }
 
