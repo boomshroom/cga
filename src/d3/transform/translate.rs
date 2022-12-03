@@ -125,7 +125,7 @@ mod test {
 
     #[test]
     fn test_from_points() {
-        use crate::d3::Transform;
+        
         let v1 = Vector::new(1.0, 0.0, 0.0);
         let v2 = Vector::new(3.0, 4.0, 5.0);
         let v3 = Vector::new(3.0, 4.0, 0.0);

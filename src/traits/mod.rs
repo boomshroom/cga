@@ -1,10 +1,10 @@
-use core::marker::PhantomData;
 
-use simba::scalar::{RealField, SubsetOf, SupersetOf};
-use simba::simd::SimdValue;
 
-use crate::d3::free::Vector;
-use crate::d3::{Line, Point};
+
+
+
+
+
 
 macro_rules! impl_simd_value {
     ($t:ident{$($field:ident,)* [$($extra:ident: $e:expr),*]}) => {

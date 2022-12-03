@@ -6,7 +6,7 @@ use num_traits::zero;
 use super::super::free::Vector;
 use super::super::transform::Translator;
 use super::Line;
-use crate::{Euclidean, Field, Hyperbolic, IBasis, Multivec, Space, Spherical, R410};
+use crate::{Euclidean, Field, Multivec, Space, R410};
 
 #[derive(Copy, Clone, Debug)]
 pub struct FPoint<T, S = Euclidean> {

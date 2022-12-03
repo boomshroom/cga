@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use simba::scalar::{RealField, SubsetOf, SupersetOf};
 use simba::simd::SimdValue;
 
-use num_traits::{one, zero};
+use num_traits::{zero};
 
 use approx::{AbsDiffEq, RelativeEq, UlpsEq};
 

@@ -1,7 +1,7 @@
 use core::fmt::{self, Display, Formatter, LowerExp, UpperExp};
 use core::ops::{Add, Div, DivAssign, Mul, MulAssign, Neg, Sub};
 
-use simba::scalar::{RealField, SubsetOf, SupersetOf};
+use simba::scalar::{SubsetOf, SupersetOf};
 #[cfg(feature = "nalgebra")]
 use simba::simd::SimdBool;
 use simba::simd::SimdValue;
@@ -13,7 +13,7 @@ use super::super::dual::DPlane;
 use super::super::round::{Point, origin};
 use super::super::transform::{Rotor, Translator};
 use super::Bivector;
-use crate::{Field, Inner, Multivec, Outer, Reflect, Scalar, Space, R410, Euclidean};
+use crate::{Field, Inner, Multivec, Outer, Reflect, Scalar, Space, R410};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Vector<T> {

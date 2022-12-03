@@ -3,7 +3,7 @@
 #[cfg(all(feature = "repr_simd", not(feature = "unstable")))]
 compile_error!("#[repr(simd)] requires unstable.");
 
-use num_traits::{zero, Zero};
+use num_traits::{zero};
 use simba::simd::SimdRealField as Field;
 
 #[cfg(feature = "unstable")]
@@ -22,7 +22,7 @@ pub mod d3;
 
 mod spaces;
 
-use spaces::IBasis;
+
 pub use spaces::{Euclidean, Hyperbolic, Space, Spherical};
 
 /// A constant zero to save on calculations and space when using general multivectors.

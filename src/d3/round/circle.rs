@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 
 use num_traits::zero;
-use approx::{abs_diff_eq, AbsDiffEq};
+
 
 use super::super::dual::DLine;
 use super::super::flat::Plane;

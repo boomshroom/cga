@@ -1,9 +1,9 @@
 use core::ops::Mul;
 use core::marker::PhantomData;
 
-use num_traits::{one, zero, Num};
+use num_traits::{one, zero};
 
-use simba::scalar::{RealField, SubsetOf, SupersetOf};
+use simba::scalar::{SubsetOf, SupersetOf};
 
 use crate::{Dual, Field, Inner, Multivec, R410, Space, Euclidean};
 
@@ -165,7 +165,7 @@ mod test {
     fn test_position_on() {
         let p1 : Point<_> = Point::new([1.0, 0.0, 0.0]);
         let p2 : Point<_> = Point::new([3.0, 4.0, 5.0]);
-        let p3 : Point<_> = Point::new([3.0, 4.0, 0.0]);
+        let _p3 : Point<_> = Point::new([3.0, 4.0, 0.0]);
 
         let l1 = p1.outer(p2).extend();
         let l2 = p2.outer(p1).extend();
